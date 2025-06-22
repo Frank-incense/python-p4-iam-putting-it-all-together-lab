@@ -8,19 +8,86 @@ from config import app, db, api
 from models import User, Recipe
 
 class Signup(Resource):
-    pass
+    def post(self):
+        data = request.get_json()
+        
+        try: 
+            newUser = User(
+                username=data.get('username'),
+                image_url=data.get('image_url'),
+                bio=data.get('bio'))
+            
+            newUser.password_hash=data.get('password')
+
+            db.session.add(newUser)
+            db.session.commit()
+            
+            return newUser.to_dict(), 201
+        
+        except ValueError as err:
+            return {'error': f"{err}"}, 422
 
 class CheckSession(Resource):
-    pass
+    def get(self):
+        user = User.query.filter_by(id=session.get('user_id')).first()
+        
+        if user:
+            print(user.to_dict())
+            return user.to_dict(), 200
+        return {'error': 'User not logged in'}, 401
 
 class Login(Resource):
-    pass
+    def post(self):
+        data = request.get_json()
+
+        user = User.query.filter_by(username=data.get('username')).first()
+        
+        if user:
+            if user.authenticate(data.get('password')):
+                session['user_id'] = user.id
+                return user.to_dict(), 200
+        return {'error': 'Incorrect username or password.'}, 401
+        
 
 class Logout(Resource):
-    pass
+    def delete(self):
+        if session['user_id']:
+            session['user_id'] = None
+            return {}, 204
+        return {'error': 'User not logged in'}, 401
 
 class RecipeIndex(Resource):
-    pass
+    def get(self):
+        if session['user_id']:
+            recipes = Recipe.query.filter_by(user_id=session['user_id']).all()
+            
+            if len(recipes) > 0:
+                return [recipe.to_dict() for recipe in recipes], 200
+            
+        return {'error': 'User not Logged in'}, 401
+    
+    def post(self):
+        if session['user_id']:
+            data = request.get_json()
+            recipe = Recipe(title=data['title'],user_id=session['user_id'])
+            
+            try: 
+                for attr in data:
+                    setattr(recipe, attr, data.get(attr))
+                
+                db.session.add(recipe)
+                db.session.commit()
+                
+                return recipe.to_dict(), 201
+            
+            except ValueError as err:
+                return {'error': f"{err}"}, 422
+        
+        return {'error': 'User not logged in'}, 401
+
+
+                
+               
 
 api.add_resource(Signup, '/signup', endpoint='signup')
 api.add_resource(CheckSession, '/check_session', endpoint='check_session')

@@ -13,6 +13,9 @@ class User(db.Model, SerializerMixin):
     bio = db.Column(db.String)
 
     recipes = db.relationship('Recipe', back_populates='user')
+
+    serialize_rules = ('-recipes.user',)
+    serialize_only = ('id', 'username','image_url', 'bio',)
     
     @hybrid_property
     def password_hash(self):
@@ -25,6 +28,12 @@ class User(db.Model, SerializerMixin):
 
     def authenticate(self, password):
         return bcrypt.check_password_hash(self._password_hash, password.encode('utf-8'))
+    
+    @validates('username')
+    def validates_username(self, key, value):
+        if value and isinstance(value, str):
+            return value
+        raise ValueError("Input a username")
         
 
 class Recipe(db.Model, SerializerMixin):
@@ -37,6 +46,9 @@ class Recipe(db.Model, SerializerMixin):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
     user = db.relationship('User', back_populates='recipes')
+
+    serialize_rules = ('-user.recipes',)
+    serialize_only = ('id', 'title', 'instructions', 'minutes_to_complete', 'user_id',)
 
     @validates('instructions')
     def validates_instructions(self, key, value):
